@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "test": "jest --silent",
-    "test:cov": "jest --silent --coverage"
+    "test:cov": "jest --silent --coverage",
+    "debug": "node --inspect index.js"
   },
   "keywords": [
     "wa",

@@ -1,6 +1,6 @@
 const qrImage = require('qr-image');
 const express = require('express');
-const basicAuth = require('express-basic-auth');
+const { sendMessageAsync } = require('./client');
 
 const createApp = (client, outgoingMessageQueue, config, db, logger = console) => { 
     const app = express();
@@ -8,9 +8,6 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
 
     app.use(express.json({ limit: '100mb' }));
 
-    const basicAuthUsers = {};
-    basicAuthUsers[config.user] = config.password;
-    app.use(basicAuth({ users: basicAuthUsers }));
 
     app.get('/', async function(_req, res) {
         const now = new Date();
@@ -18,6 +15,25 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
             systemTime: now,
             uptimeSec: Math.round((now.getTime() - START_DATE.getTime()) / 1000),
         });
+    });
+
+    //create a route to health check
+    app.get('/health', async function(_req, res) {
+        res.status(200).json({ status: 'ok' });
+    });
+
+    app.get('/connected', async function(_req, res) {
+        try {
+            const state = await client.getState();
+            if (state == 'CONNECTED') {
+                res.status(200).json({ connected: true });
+            } else {
+                res.status(200).json({ connected: false });
+            }
+        } catch (err) {
+            logger.error(err);
+            res.status(500).json({ error: err.message });
+        }
     });
 
     app.get('/qr', async function(_req, res) {
@@ -30,6 +46,7 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
         } else {
             let stream = qrImage.image(client.qr, { type: 'png', ec_level: 'H', size: 5, margin: 0 });
             res.setHeader('Content-type', 'image/png');
+            res.status(200);
             stream.pipe(res);
         }
     });
@@ -45,19 +62,46 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
         }
     });
 
+    // Function to validate and format Brazilian phone numbers
+    function formatBrazilianPhoneNumber(phoneNumber) {
+        // Remove any non-digit characters
+        const digitsOnly = phoneNumber.replace(/\D/g, '');
+
+        // Check if it's a valid Brazilian number
+        if (digitsOnly.length === 13 && digitsOnly.startsWith('55')) {
+            // It's already in the correct format
+            return `${digitsOnly}@c.us`;
+        } else {        
+            // It's not a valid Brazilian number
+            logger.error('Formato de número de telefone brasileiro inválido');
+            return phoneNumber
+        }
+    }
     app.post('/send', async function(req, res) {
         try {
-            outgoingMessageQueue.push(req.body)
-                .on('failed', function (err) {
-                    logger.error('sendMessage FAILED');
-                    logger.error(err);
-                });
+            const { number, message } = req.body;
+            if (!number || !message) {
+                return res.status(400).json({ error: 'Phone and message are required' });
+            }
+            
+            let formattedNumber = number
+            
+            // Check if it's a Brazilian number and format accordingly
+            if (number.startsWith('55') || number.startsWith('+55')) {
+                formattedNumber = formatBrazilianPhoneNumber(number);
+            } else {
+                // For non-Brazilian numbers, use the previous formatting
+                formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
+            }
+            
+            await client.sendMessage(formattedNumber, message);
             res.json({
-                message: 'Message to ' + req.body.number + ' is succesfully queued',
+                message: `Message to ${number} is successfully queued`,
             });
+            logger.info(`Message to ${number} is successfully queued`);
         } catch (err) {
-            logger.error(err);
-            res.status(500).json({ error: err.message });
+            logger.error('Error in /send route:', err);
+            res.status(500).json({ error: err.message, stack: err.stack });
         }
     });
 
