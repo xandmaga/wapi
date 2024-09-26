@@ -19,7 +19,7 @@ function getAssetPath(filename) {
 
 const CHROMIUM_PATH_MACOS = path.join('Chromium.app/Contents/MacOS/Chromium');
 const CONFIG_PATH = getAssetPath('config.json');
-const CHROMIUM_PATH = getAssetPath(path.join('chromium', process.platform === 'win32' ? 'Chromium.exe' : process.platform === 'darwin' ? CHROMIUM_PATH_MACOS : 'Chromium'));
+const CHROMIUM_PATH = getAssetPath(path.join('chromium', process.platform === 'win32' ? 'chrome.exe' : process.platform === 'darwin' ? CHROMIUM_PATH_MACOS : 'Chromium'));
 const USER_DATA_PATH = path.join(__dirname, '.wwebjs_auth');
 
 let config;
