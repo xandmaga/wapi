@@ -1,11 +1,10 @@
 const qrImage = require('qr-image');
 const express = require('express');
-const { sendMessageAsync } = require('./client');
 
-const createApp = (client, outgoingMessageQueue, config, db, logger = console) => { 
+const createApp = (client, logger = console) => { 
     const app = express();
     const START_DATE = new Date();
-
+    
     app.use(express.json({ limit: '100mb' }));
 
 
@@ -20,6 +19,14 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
     //create a route to health check
     app.get('/health', async function(_req, res) {
         res.status(200).json({ status: 'ok' });
+    });
+
+    app.get('/authenticated', async function(_req, res) {
+        res.status(200).json({ authenticated: client.isAuthenticated });
+    });
+
+    app.get('/ready', async function(_req, res) {
+        res.status(200).json({ ready: client.isReady });
     });
 
     app.get('/connected', async function(_req, res) {
@@ -40,7 +47,12 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
         const state = await client.getState();
         logger.info(`client state is ${state}`);
         if (state == 'CONNECTED') {
-            res.status(403).json({ error: `Already linked to ${client.info.wid.user}` });
+            res.status(200).json(
+                {   
+                    isConnected: true,
+                    message: `Already linked to ${client.info.wid.user}`
+                }
+            );
         } else if (!client.qr) {
             res.status(404).json({ error: 'No QR found' });
         } else {
@@ -62,39 +74,19 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
         }
     });
 
-    // Function to validate and format Brazilian phone numbers
-    function formatBrazilianPhoneNumber(phoneNumber) {
-        // Remove any non-digit characters
-        const digitsOnly = phoneNumber.replace(/\D/g, '');
-
-        // Check if it's a valid Brazilian number
-        if (digitsOnly.length === 13 && digitsOnly.startsWith('55')) {
-            // It's already in the correct format
-            return `${digitsOnly}@c.us`;
-        } else {        
-            // It's not a valid Brazilian number
-            logger.error('Formato de número de telefone brasileiro inválido');
-            return phoneNumber
-        }
-    }
     app.post('/send', async function(req, res) {
         try {
-            const { number, message } = req.body;
-            if (!number || !message) {
+            let number;
+            let message;
+
+            if (req.body.phoneNumber && req.body.message) {
+                number = req.body.phoneNumber;
+                message = req.body.message;
+            } else {
                 return res.status(400).json({ error: 'Phone and message are required' });
             }
-            
-            let formattedNumber = number
-            
-            // Check if it's a Brazilian number and format accordingly
-            if (number.startsWith('55') || number.startsWith('+55')) {
-                formattedNumber = formatBrazilianPhoneNumber(number);
-            } else {
-                // For non-Brazilian numbers, use the previous formatting
-                formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
-            }
-            
-            await client.sendMessage(formattedNumber, message);
+
+            await client.sendMessage(number, message);
             res.json({
                 message: `Message to ${number} is successfully queued`,
             });
@@ -134,45 +126,6 @@ const createApp = (client, outgoingMessageQueue, config, db, logger = console) =
             res.status(500).json({ error: err.message });
         }
     });
-
-    app.get('/webhooks', async function(_req, res) {
-        try {
-            res.json(await db.webhooks.all());
-        } catch (err) {
-            logger.error(err);
-            res.status(500).json({ error: err.message });
-        }
-    });
-
-    app.post('/webhooks', async function(req, res) {
-        try {
-            await db.webhooks.create({
-                postUrl: req.body.postUrl,
-                authHeader: req.body.authHeader,
-                eventCode: req.body.eventCode,
-            });
-            res.status(201).json({
-                message: 'Webhook created: ' + req.body.postUrl,
-            });
-        } catch (err) {
-            logger.error(err);
-            res.status(500).json({ error: err.message });
-        }
-    });
-
-
-    app.delete('/webhooks/:id', async function(req, res) {
-        try {
-            await db.webhooks.delete(req.params.id);
-            res.status(200).json({
-                message: 'Webhook deleted: ' + req.params.id,
-            });
-        } catch (err) {
-            logger.error(err);
-            res.status(500).json({ error: err.message });
-        }
-    });
-
 
     return app;
 }
