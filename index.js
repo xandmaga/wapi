@@ -87,6 +87,14 @@ async function Main() {
             });
         });
 
+
+
+        client.on('message', async msg => {
+          let chat = await client.getChatById(msg.from)
+          console.log(`Mensagem ${msg.body} recebida no chat ${chat.name}`)
+
+     });
+
         // Start the server
         server.listen(port, () => {
             logger.info(`Servidor escutando na porta ${port}`);
