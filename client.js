@@ -66,7 +66,7 @@ const createClient = async (argv, CHROMIUM_PATH, isPackaged) => {
     }
 
     client.on('loading_screen', (percent, message) => {
-        logger.info('LOADING SCREEN', percent, message);
+        logger.info(`LOADING SCREEN, percent: ${percent}, message: ${message}`);
     });
 
     client.on('qr', (qr) => {
@@ -76,7 +76,6 @@ const createClient = async (argv, CHROMIUM_PATH, isPackaged) => {
     client.on('ready', async () => {
         logger.info('WBOT is spinning up!');
         client.isReady = true;
-        await utils.delay(5000);
     });
 
     client.on('authenticated', () => {

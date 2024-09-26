@@ -48,7 +48,7 @@ function isPortInUse(port) {
 
 async function Main() {
     if (await isPortInUse(3000)) {
-        console.log('Port 3000 is already in use. Exiting...');
+        console.log('Porta 3000 já está sendo utilizada. Saindo...');
         process.exit(1);
     }
 
@@ -64,20 +64,20 @@ async function Main() {
 
         // WebSocket connection handler
         wss.on('connection', (ws) => {
-            logger.info('New WebSocket connection');
+            logger.info('Nova conexão WebSocket');
 
-            // Send current QR code if available
+            // Enviar o QR atual se disponível
             if (client.qr) {
                 ws.send(JSON.stringify({ type: 'qr', data: client.qr }));
             }
 
             // Handle WebSocket connection close
             ws.on('close', () => {
-                logger.info('WebSocket connection closed');
+                logger.info('Conexão WebSocket fechada');
             });
         });
 
-        // Modify the client's QR event to broadcast to all connected WebSocket clients
+        // Modificar o evento QR do cliente para enviar para todos os clientes conectados WebSocket
         client.on('qr', (qr) => {
             client.qr = qr;
             wss.clients.forEach((client) => {
@@ -89,23 +89,23 @@ async function Main() {
 
         // Start the server
         server.listen(port, () => {
-            logger.info(`Server listening on port ${port}`);
+            logger.info(`Servidor escutando na porta ${port}`);
         });
 
         // Error handling for server
         server.on('error', (error) => {
           if (error.code === 'EADDRINUSE') {
-            console.log('Address already in use, retrying...');
+            console.log('Porta já em uso, tentando novamente...');
             setTimeout(() => {
               server.close();
               server.listen(port);
             }, 1000);
           } else {
-            console.error('Server error:', error);
+            console.error('Erro do servidor:', error);
           }
         });
     } catch (error) {
-        logger.error(`Failed to start server: ${error}`);
+        logger.error(`Falha ao iniciar o servidor: ${error}`);
     }
 }
 
